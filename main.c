@@ -2,6 +2,7 @@
 #include "main.h"
 #include <unistd.h>
 #include <stdlib.h>
+#include "server.h"
 
 
 int main(int argc, const char *argv[])
@@ -14,3 +15,5 @@ int main(int argc, const char *argv[])
 	}
 	return 0;
 }
+
+
