@@ -6,12 +6,12 @@ void str_split(char* str, const char* tok, char*** res, int* count) {
 
     // To avoid Segmentation fault we need to convert to char array....
     // Maybe I need to write a new strtok function?
-    char buff[256];
-    strncpy(buff, str, 256);
+    char buff[10001];
+    strncpy(buff, str, 10001);
 
     // some var for split
     int _count = 0;
-    char* _res[128];
+    char* _res[5000];
     char* tmp_str;
 
     tmp_str = strtok(buff, tok);
