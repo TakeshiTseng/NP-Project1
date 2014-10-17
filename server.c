@@ -35,9 +35,13 @@ int is_cmd_exist(char* cmd, char* env_path) {
 }
 
 void exec_cmd_node(cmd_node_t* node, int last_pipefd[2]) {
-    close(0);
-    dup(last_pipefd[0]);
-    close(last_pipefd[0]);
+    // check stdin
+    // if last_pipefd[0] is stdin, do not close it
+    if(last_pipefd[0] != 0){
+        close(0);
+        dup(last_pipefd[0]);
+        close(last_pipefd[0]);
+    }
 
     if(node->next_node != NULL){
         // create pipe
@@ -49,12 +53,25 @@ void exec_cmd_node(cmd_node_t* node, int last_pipefd[2]) {
 
         if(pid != 0) { // parent
             // close origin output and connect to pipe
-            close(1);
-            dup(pipefd[1]);
-            close(pipefd[1]);
-            execvp(node->cmd, node->args);
+            if( close(1) == -1){
+                fprintf(stderr, "Can't close output");
+            }
+            if(dup(pipefd[1]) == -1) {
+                fprintf(stderr, "Can't dup output from fd: %d", pipefd[1]);
+            }
+            if(close(pipefd[1]) == -1) {
+                fprintf(stderr, "Can't close fd: %d", pipefd[1]);
+            }
+
+            // execute command with paramaters
+            if(execvp(node->cmd, node->args) == -1) {
+                fprintf(stderr, "Can't execute command: %s", node->cmd);
+            }
         } else { // child
-            close(pipefd[1]);
+
+            if(close(pipefd[1]) == -1) {
+                fprintf(stderr, "Can't close fd: %d", pipefd[1]);
+            }
             exec_cmd_node(node->next_node, pipefd);
         }
     } else {
@@ -62,7 +79,3 @@ void exec_cmd_node(cmd_node_t* node, int last_pipefd[2]) {
     }
 }
 
-void exec_cmd_node_list(cmd_node_t* node){
-    int pipefd[2] = {0, 1};
-    exec_cmd_node(node, pipefd);
-}
