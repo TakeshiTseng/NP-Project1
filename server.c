@@ -35,30 +35,34 @@ int is_cmd_exist(char* cmd, char* env_path) {
 }
 
 void exec_cmd_node(cmd_node_t* node, int last_pipefd[2]) {
+    close(0);
+    dup(last_pipefd[0]);
+    close(last_pipefd[0]);
+
     if(node->next_node != NULL){
+        // create pipe
         int pipefd[2];
+        pipe(pipefd);
 
+        // fork
+        int pid = fork();
 
-    } else {
-        // connect input from parent process
-        if(dup2(0, last_pipefd[0]) == -1) {
-            write(2, "can't dup", strlen("can't dup"));
+        if(pid != 0) { // parent
+            // close origin output and connect to pipe
+            close(1);
+            dup(pipefd[1]);
+            close(pipefd[1]);
+            execvp(node->cmd, node->args);
+        } else { // child
+            close(pipefd[1]);
+            exec_cmd_node(node->next_node, pipefd);
         }
-        char* cmd = node->cmd;
-        char** args = node->args;
-
+    } else {
+        execvp(node->cmd, node->args);
     }
 }
 
 void exec_cmd_node_list(cmd_node_t* node){
-    if(node->next_node != NULL){
-        int pipefd[2];
-        pipe(pipefd);
-
-    } else {
-        // if there are no pipe, using standard IO
-        exec_cmd_node(node, NULL);
-
-    }
-
+    int pipefd[2] = {0, 1};
+    exec_cmd_node(node, pipefd);
 }
