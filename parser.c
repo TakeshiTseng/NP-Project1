@@ -6,11 +6,11 @@
 #include <stdlib.h>
 #include <regex.h>
 
-
+token_node_t* _tok_list = NULL;
 void _read_and_parse();
 int _get_type(char* str);
 
-int init_source_fd(int _sfd) {
+void init_source_fd(int _sfd) {
     _source_fd = _sfd;
 }
 
@@ -20,10 +20,23 @@ void _read_and_parse() {
     if(_n_bytes <= 0) { // end of stream or error
         // TODO: need to handle error
         token_node_t* new_node = malloc(sizeof(token_node_t));
-        new_node->token_str = NULL;
+        new_node->token_str = "";
         new_node->type = FEOF;
-        insert_node(&_token_list, new_node);
+        insert_node(&_tok_list, new_node);
+		return;
     }
+
+	// need to add a space before new line "\n"
+	if(_p_buffer[_n_bytes - 1] == '\n') {
+		char* __tmp = malloc(_n_bytes + 1);
+		strcpy(__tmp, _p_buffer);
+		__tmp[_n_bytes+1] = '\0';
+		__tmp[_n_bytes] = '\n';
+		__tmp[_n_bytes-1] = ' ';
+		strcpy(_p_buffer, __tmp);
+		free(__tmp);
+	}
+
     char** _result;
     int _num_of_token;
     str_split(_p_buffer, " ", &_result, &_num_of_token);
@@ -41,7 +54,7 @@ void _read_and_parse() {
         // set type to node
         new_node->type = type;
 
-        insert_node(&_token_list, new_node);
+        insert_node(&_tok_list, new_node);
     }
 }
 
@@ -59,35 +72,16 @@ int _get_type(char* str) {
     }
 }
 
-int _is_match(const char* str, char* regex_str) {
-    regex_t regex;
-    int res;
-    const int nmatch = 1;
-    regmatch_t pmatch[nmatch];
-
-    // compile regex
-    if(regcomp(&regex, regex_str, REG_EXTENDED) != 0) {
-        // if there is an error, return fail
-        return -1;
-    }
-
-    res = regexec(&regex, str, nmatch, pmatch, 0);
-    if(res == REG_NOMATCH){
-        return 0;
-    } else {
-        return 1;
-    }
-}
 
 int next_token(char** token_string) {
 
     // if all tokens are processed
     // get next line
-    if(_token_list == NULL) {
+    if(_tok_list == NULL) {
         _read_and_parse();
     }
 
-    token_node_t* _token_node = pull_node(_token_list);
+    token_node_t* _token_node = pull_node(&_tok_list);
 
     // get token string
     char* tmp_str = _token_node->token_str;

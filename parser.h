@@ -4,10 +4,9 @@
 
 char _p_buffer[10001];
 int _source_fd;
-token_node_t* _token_list = NULL;
 
 int next_token(char** token_string);
-int init_source_fd(int _sfd);
+void init_source_fd(int _sfd);
 
 
 #endif
