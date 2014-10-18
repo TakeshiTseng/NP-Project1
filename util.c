@@ -1,6 +1,7 @@
 #include "util.h"
 #include <stdlib.h>
 #include <string.h>
+#include <regex.h>
 
 void str_split(char* str, const char* tok, char*** res, int* count) {
 
@@ -26,5 +27,33 @@ void str_split(char* str, const char* tok, char*** res, int* count) {
 
     *count = _count;
     *res = _res;
+
+}
+
+int is_match(const char* str, char* regex_str) {
+    regex_t regex;
+    int res;
+    const int nmatch = 1;
+    regmatch_t pmatch[nmatch];
+
+    // compile regex
+    if(regcomp(&regex, regex_str, REG_EXTENDED) != 0) {
+        // if there contains an error
+        regfree(&regex);
+        return -1;
+    }
+
+    // check match
+    res = regexec(&regex, str, nmatch, pmatch, 0);
+
+    // free regex data
+    regfree(&regex);
+
+    // return result
+    if(res == REG_NOMATCH){
+        return 0;// no match
+    } else {
+        return 1;// match
+    }
 
 }

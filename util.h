@@ -3,7 +3,7 @@
 
 
 void str_split(char* str, const char* tok, char*** res, int* count);
-
+int is_match(const char* str, char* regex);
 
 
 
