@@ -19,6 +19,6 @@ struct token_node {
 typedef struct token_node token_node_t;
 
 void insert_node(token_node_t** head, token_node_t* node);
-token_node_t* pull_node(token_node_t* list);
+token_node_t* pull_node(token_node_t** list);
 
 #endif
