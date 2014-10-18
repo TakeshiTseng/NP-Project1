@@ -7,6 +7,7 @@
 #define PIPE_N   2
 #define PASS     3
 #define NEW_LINE 4
+#define FEOF 	 5
 
 struct token_node {
     int type;
