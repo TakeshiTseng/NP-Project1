@@ -1,5 +1,5 @@
 #include <string.h>
-#include "parser.h"
+#include "tokenizer.h"
 #include <unistd.h>
 #include "util.h"
 #include "token.h"
@@ -23,19 +23,19 @@ void _read_and_parse() {
         new_node->token_str = "";
         new_node->type = FEOF;
         insert_node(&_tok_list, new_node);
-		return;
+        return;
     }
 
-	// need to add a space before new line "\n"
-	if(_p_buffer[_n_bytes - 1] == '\n') {
-		char* __tmp = malloc(_n_bytes + 1);
-		strcpy(__tmp, _p_buffer);
-		__tmp[_n_bytes+1] = '\0';
-		__tmp[_n_bytes] = '\n';
-		__tmp[_n_bytes-1] = ' ';
-		strcpy(_p_buffer, __tmp);
-		free(__tmp);
-	}
+    // need to add a space before new line "\n"
+    if(_p_buffer[_n_bytes - 1] == '\n') {
+        char* __tmp = malloc(_n_bytes + 1);
+        strcpy(__tmp, _p_buffer);
+        __tmp[_n_bytes+1] = '\0';
+        __tmp[_n_bytes] = '\n';
+        __tmp[_n_bytes-1] = ' ';
+        strcpy(_p_buffer, __tmp);
+        free(__tmp);
+    }
 
     char** _result;
     int _num_of_token;
@@ -47,7 +47,7 @@ void _read_and_parse() {
         int type = _get_type(tmp_str);
 
         // set token string to node
-        new_node->token_str = malloc(strlen(tmp_str));
+        new_node->token_str = malloc(sizeof(char) * (strlen(tmp_str) + 1));
         strcpy(new_node->token_str, tmp_str);
         free(tmp_str);
 
@@ -85,7 +85,7 @@ int next_token(char** token_string) {
 
     // get token string
     char* tmp_str = _token_node->token_str;
-    *token_string = malloc(sizeof(char)*strlen(tmp_str));
+    *token_string = malloc(sizeof(char) * (strlen(tmp_str) + 1));
     strcpy(*token_string, tmp_str);
 
     // get token type
@@ -94,4 +94,11 @@ int next_token(char** token_string) {
     free(_token_node);
 
     return _type;
+}
+
+token_node_t* get_token_list() {
+    if(_tok_list == NULL) {
+        _read_and_parse();
+    }
+    return _tok_list;
 }

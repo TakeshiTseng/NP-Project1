@@ -7,6 +7,6 @@ int _source_fd;
 
 int next_token(char** token_string);
 void init_source_fd(int _sfd);
-
+token_node_t* get_token_list();
 
 #endif
