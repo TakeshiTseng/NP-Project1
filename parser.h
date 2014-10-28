@@ -15,6 +15,6 @@ struct arg_node {
 };
 
 typedef struct arg_node arg_node_t;
-cmd_node_t* parse_tokens();
+void parse_tokens(cmd_node_t** cmd_node_list);
 
 #endif

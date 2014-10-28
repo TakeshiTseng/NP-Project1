@@ -12,10 +12,12 @@ int _get_type(char* str);
 
 void init_source_fd(int _sfd) {
     _source_fd = _sfd;
+    _p_buffer = malloc(sizeof(char) * 10010);
 }
 
 void _read_and_parse() {
-    int _n_bytes = read(_source_fd, _p_buffer, 10001);
+    bzero(_p_buffer, 10010); // clean up before read.
+    int _n_bytes = read(_source_fd, _p_buffer, 10010);
 
     if(_n_bytes <= 0) { // end of stream or error
         // TODO: need to handle error
@@ -27,15 +29,10 @@ void _read_and_parse() {
     }
 
     // need to add a space before new line "\n"
-    if(_p_buffer[_n_bytes - 1] == '\n') {
-        char* __tmp = malloc(_n_bytes + 1);
-        strcpy(__tmp, _p_buffer);
-        __tmp[_n_bytes+1] = '\0';
-        __tmp[_n_bytes] = '\n';
-        __tmp[_n_bytes-1] = ' ';
-        strcpy(_p_buffer, __tmp);
-        free(__tmp);
-    }
+    str_replace_one_world(&_p_buffer, '\r', ' ');
+
+    // TODO: fix it
+    // _p_buffer = insert_char_to_match(_p_buffer, '\n', ' ', INS_MODE_BOTH);
 
     char** _result;
     int _num_of_token;
@@ -44,17 +41,38 @@ void _read_and_parse() {
     for(_c=0; _c<_num_of_token; _c++) {
         token_node_t* new_node = malloc(sizeof(token_node_t));
         char* tmp_str = _result[_c];
-        int type = _get_type(tmp_str);
+        int type;
+        int new_line_pos = -1;
+        if(str_starts_with(tmp_str, '\n') && strcmp(tmp_str, "\n") != 0) {
+            new_line_pos = 1;
 
+            token_node_t* new_line_tok = malloc(sizeof(token_node_t));
+            new_line_tok->type = NEW_LINE;
+            new_line_tok->token_str = "\n";
+            new_line_tok->next_node = NULL;
+            insert_node(&_tok_list, new_line_tok);
+            tmp_str = (tmp_str+1);
+        }
+        if(str_ends_with(tmp_str, '\n') && strcmp(tmp_str, "\n") != 0) {
+            tmp_str[strlen(tmp_str)-1] = '\0'; // remove new line
+            new_line_pos = 2;
+        }
+
+        type = _get_type(tmp_str);
         // set token string to node
         new_node->token_str = malloc(sizeof(char) * (strlen(tmp_str) + 1));
         strcpy(new_node->token_str, tmp_str);
-        free(tmp_str);
-
-        // set type to node
         new_node->type = type;
-
+        new_node->next_node = NULL;
         insert_node(&_tok_list, new_node);
+
+        if(new_line_pos == 2) {
+            token_node_t* new_line_tok = malloc(sizeof(token_node_t));
+            new_line_tok->type = NEW_LINE;
+            new_line_tok->token_str = "\n";
+            new_line_tok->next_node = NULL;
+            insert_node(&_tok_list, new_line_tok);
+        }
     }
 }
 
@@ -91,6 +109,7 @@ int next_token(char** token_string) {
     // get token type
     int _type = _token_node->type;
 
+    _token_node->next_node = NULL;
     free(_token_node);
 
     return _type;

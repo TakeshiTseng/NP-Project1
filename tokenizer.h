@@ -2,7 +2,7 @@
 #define __PARSER_H__
 #include "token.h"
 
-char _p_buffer[10001];
+char* _p_buffer;
 int _source_fd;
 
 int next_token(char** token_string);

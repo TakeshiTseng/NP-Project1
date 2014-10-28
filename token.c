@@ -3,6 +3,9 @@
 #include <stdlib.h>
 
 void free_list(token_node_t** head) {
+    if(*head == NULL) {
+        return;
+    }
     if((*head)->next_node == NULL) {
         free(*head);
     } else {
@@ -17,6 +20,7 @@ void insert_node(token_node_t** head, token_node_t* node) {
 
     if(*head == NULL) {
         *head = node;
+        (*head)->next_node = NULL;
     } else {
         token_node_t* _p = *head;
         // walk to last node
