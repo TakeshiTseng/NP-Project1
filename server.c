@@ -14,9 +14,8 @@
 #include "tokenizer.h"
 
 
-char* default_prompt = "\r% ";
 char* welcome_message = "****************************************\n** Welcome to the information server. **\n****************************************\n";
-char* error_msg1 = "\rUnknown command: [";
+char* error_msg1 = "Unknown command: [";
 char* error_msg2 = "].";
 
 void serve(int client_fd) {
@@ -39,10 +38,11 @@ void serve(int client_fd) {
     dup(client_fd);
 
     // print welcome message
-    write(1, welcome_message, strlen(welcome_message)+1);
+    write(1, welcome_message, strlen(welcome_message));
 
     // write "% " to client
-    write(1, default_prompt, strlen(default_prompt)+1);
+    write(1, "% ", 2);
+    usleep(100);
 
     cmd_node_t* cmd_node_list = NULL;
     parse_tokens(&cmd_node_list);
@@ -60,9 +60,10 @@ void serve(int client_fd) {
             if(env_name != NULL) {
                 char* env_val = getenv(env_name);
                 write(1, env_name, strlen(env_name));
-                write(1, "= ", 2);
+                write(1, "=", 2);
                 write(1, env_val, strlen(env_val));
-                write(1, "\r\n", 2);
+                write(1, "\n", 1);
+                usleep(100);
             }
             cmd_node_list = cmd_node_list->next_node;
         } else if(strcmp(cmd_node_list->cmd, "setenv") == 0) {
@@ -70,6 +71,7 @@ void serve(int client_fd) {
             char* env_val = cmd_node_list->args[2];
             setenv(env_name, env_val, 1);
             cmd_node_list = cmd_node_list->next_node;
+            usleep(100);
         } else if(strcmp(cmd_node_list->cmd, "exit") == 0) {
             // TODO: close all child process....
             close(client_fd);
@@ -87,14 +89,14 @@ void serve(int client_fd) {
                         write(1, error_msg1, strlen(error_msg1));
                         write(1, node_to_place->cmd, strlen(node_to_place->cmd));
                         write(1, error_msg2, strlen(error_msg2));
-                        write(1, "\r\n", 2);
+                        write(1, "\n", 1);
                         free_cmd_list(&cmd_node_list);
                     }
                 }
             }
         }
         execute_cmd_node_list_chain();
-        write(1, default_prompt, sizeof(default_prompt));
+        write(1, "% ", 2);
         parse_tokens(&cmd_node_list);
     }
 }
@@ -208,7 +210,8 @@ int place_cmd_node(cmd_node_t* cmd_node) {
     while(tmp_node_chain != NULL) {
         if(tmp_node_chain->tail->pipe_count == 1) {
             tmp_node_chain->tail->pipe_count--;
-            insert_cmd_node(&(tmp_node_chain->tail), cmd_node);
+            cmd_node_t* node_to_insert = clone_cmd_node(cmd_node);
+            insert_cmd_node(&(tmp_node_chain->tail), node_to_insert);
             tmp_node_chain->tail = cmd_node;
             insert_tag = 1;
         } else {
@@ -225,6 +228,8 @@ int place_cmd_node(cmd_node_t* cmd_node) {
         new_chain_node->next_node = NULL;
 
         insert_to_node_chain(&node_list_chain, new_chain_node);
+    } else {
+        free_cmd_node(cmd_node);
     }
     return 0;
 }
