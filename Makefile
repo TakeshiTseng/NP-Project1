@@ -1,6 +1,4 @@
 CC=gcc
 
 all:
-	$(CC) main.c ./cmd_node.c ./node_list.c ./parser.c ./server.c ./token.c ./tokenizer.c ./util.c -o ras.o
-	mv ras.o ./ras
-
+	$(CC) -g main.c ./cmd_node.c ./node_list.c ./parser.c ./server.c ./token.c ./tokenizer.c ./util.c -o ras.o
