@@ -10,13 +10,26 @@
 #include <time.h>
 #include "server.h"
 
+
+void handleSIGCHLD() {
+    int stat;
+
+    /*Kills all the zombie processes*/
+    while(waitpid(-1, &stat, WNOHANG) > 0);
+}
+
 int main(int argc, const char * argv[])
 {
+
+    // handling zombie processes
+    signal(SIGCHLD, handleSIGCHLD);
+
+
     srand(time(0));
     struct sockaddr_in my_addr;
 
     struct sockaddr_in client_addr;
-    int port = 1001 + rand() % 5000;
+    int port = 2000 + rand() % 1000;
     printf("Port : %d\n", port);
     my_addr.sin_family = AF_INET;
     my_addr.sin_port = htons(port);
