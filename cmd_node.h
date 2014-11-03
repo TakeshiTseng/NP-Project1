@@ -8,6 +8,8 @@ struct cmd_node {
     char* filename;
     int pipe_count;
     struct cmd_node* next_node;
+    int pipe_fd[2];
+    int is_exec;
 };
 
 typedef struct cmd_node cmd_node_t;
