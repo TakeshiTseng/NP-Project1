@@ -61,6 +61,9 @@ void parse_tokens(cmd_node_t** cmd_node_list) {
             current_cmd_node->pipe_count = 0;
             current_cmd_node->next_node = NULL;
             current_cmd_node->filename = NULL;
+            current_cmd_node->pipe_fd[0] = -1;
+            current_cmd_node->pipe_fd[1] = -1;
+            current_cmd_node->is_exec = 0;
 
             // copy text to cmd node
             current_cmd_node->cmd = malloc(sizeof(char)*(strlen(token_str) + 1));

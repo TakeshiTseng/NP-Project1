@@ -12,13 +12,16 @@
 #include <stdio.h>
 #include "parser.h"
 #include "tokenizer.h"
-
+#include "pipe_node.h"
 
 char* welcome_message = "****************************************\n** Welcome to the information server. **\n****************************************\n";
 char* error_msg1 = "Unknown command: [";
 char* error_msg2 = "].";
 
 void serve(int client_fd) {
+
+    cmd_exec_list = NULL;
+    pipe_list = NULL;
 
     // check if fd is right
     if(client_fd == -1) {
@@ -46,6 +49,7 @@ void serve(int client_fd) {
 
     cmd_node_t* cmd_node_list = NULL;
     parse_tokens(&cmd_node_list);
+    int state;
 
     while(cmd_node_list != NULL) {
         // process commands
@@ -63,7 +67,6 @@ void serve(int client_fd) {
                 write(1, "=", 2);
                 write(1, env_val, strlen(env_val));
                 write(1, "\n", 1);
-                usleep(100);
             }
             cmd_node_list = cmd_node_list->next_node;
         } else if(strcmp(cmd_node_list->cmd, "setenv") == 0) {
@@ -71,18 +74,17 @@ void serve(int client_fd) {
             char* env_val = cmd_node_list->args[2];
             setenv(env_name, env_val, 1);
             cmd_node_list = cmd_node_list->next_node;
-            usleep(100);
         } else if(strcmp(cmd_node_list->cmd, "exit") == 0) {
             // TODO: close all child process....
-            close(client_fd);
-            exit(0);
+            return;
         } else {
             while(cmd_node_list != NULL) {
                 if(cmd_node_list->pipe_count == -1) {
-                    // only new line, pass and wait for next line
+                    // new line, execute
                     cmd_node_list = cmd_node_list->next_node;
                     break;
                 } else {
+
                     cmd_node_t* node_to_place = pull_cmd_node(&cmd_node_list);
                     if(place_cmd_node(node_to_place) == -1) {
                         // command not found
@@ -95,7 +97,6 @@ void serve(int client_fd) {
                 }
             }
         }
-        execute_cmd_node_list_chain();
         write(1, "% ", 2);
         parse_tokens(&cmd_node_list);
     }
@@ -127,77 +128,7 @@ int is_cmd_exist(char* cmd, char* env_path) {
     // if all path are not found, return -1
 }
 
-void exec_cmd_node(cmd_node_t* node, int last_pipefd[2]) {
-    // check stdin
-    // if last_pipefd[0] is stdin, do not close it
-    if(last_pipefd[0] != 0){
-        close(0);
-        dup(last_pipefd[0]);
-        close(last_pipefd[0]);
-    }
-
-    if(node->next_node != NULL){
-        // create pipe
-        int pipefd[2];
-        pipe(pipefd);
-
-        // fork
-        int pid = fork();
-
-        if(pid != 0) { // parent
-            // close origin output and connect to pipe
-            if(close(1) == -1){
-                fprintf(stderr, "Can't close output");
-            }
-            if(dup(pipefd[1]) == -1) {
-                fprintf(stderr, "Can't dup output from fd: %d", pipefd[1]);
-            }
-            if(close(pipefd[1]) == -1) {
-                fprintf(stderr, "Can't close fd: %d", pipefd[1]);
-            }
-
-            // execute command with paramaters
-            if(execvp(node->cmd, node->args) == -1) {
-                fprintf(stderr, "Can't execute command: %s", node->cmd);
-            }
-        } else { // child
-
-            if(close(pipefd[1]) == -1) {
-                fprintf(stderr, "Can't close fd: %d", pipefd[1]);
-            }
-            exec_cmd_node(node->next_node, pipefd);
-        }
-    } else {
-        // fork and execute it
-        int pid = fork();
-        if(pid == 0) {
-            if(node->pipe_to_file == 1) {
-                int file_fd = open(node->filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IRGRP | S_IWGRP | S_IROTH);
-                if(file_fd == -1) {
-                    fprintf(stderr, "Can't open file %s\n", node->filename);
-                }
-                if(close(1) == -1) {
-                    fprintf(stderr, "can't close output\n");
-                } // close output
-                if(dup(file_fd) == -1) {
-                    fprintf(stderr, "can't dup\n");
-                }// replace with file fd
-
-                if(close(file_fd) == -1) {
-                    fprintf(stderr, "can't close file fd\n");
-                } // close file fd
-            }
-
-            // child to execute
-            execvp(node->cmd, node->args);
-        }
-    }
-}
-
 int place_cmd_node(cmd_node_t* cmd_node) {
-    node_t* tmp_node_chain = node_list_chain;
-
-    // get cmd node and let list to point to next
 
     char* env_path = getenv("PATH");
     if(is_cmd_exist(cmd_node->cmd, env_path) == -1) {
@@ -206,71 +137,94 @@ int place_cmd_node(cmd_node_t* cmd_node) {
         return -1;
     }
 
-    int insert_tag = 0; // if cmd insert to chain, set to 1
-    while(tmp_node_chain != NULL) {
-        if(tmp_node_chain->tail->pipe_count == 1) {
-            tmp_node_chain->tail->pipe_count--;
-            cmd_node_t* node_to_insert = clone_cmd_node(cmd_node);
-            insert_cmd_node(&(tmp_node_chain->tail), node_to_insert);
-            tmp_node_chain->tail = cmd_node;
-            insert_tag = 1;
-        } else {
-            tmp_node_chain->tail->pipe_count--;
+    int pipe_count = cmd_node->pipe_count;
+    int pid = -1;
+    int input_pipe_fd = -1;
+    int output_pipe_fd = -1;
+    decrease_all_pipe_node(pipe_list);
+
+    // get this process input source
+    pipe_node_t* in_pipe_node = find_pipe_node_by_count(pipe_list, 0);
+    if(in_pipe_node != NULL) {
+        input_pipe_fd = in_pipe_node->in_fd;
+        close(in_pipe_node->out_fd);
+        in_pipe_node->count--;
+    }
+
+    // get this process output source
+    pipe_node_t* out_pipe_node = find_pipe_node_by_count(pipe_list, pipe_count);
+    if(out_pipe_node != NULL) {
+        output_pipe_fd = out_pipe_node->out_fd;
+    } else if(cmd_node->pipe_to_file == 1){
+        output_pipe_fd = get_file_fd(cmd_node->filename);
+    } else if(cmd_node->pipe_count != 0) {
+        int new_pipe_fd[2];
+        pipe(new_pipe_fd);
+        out_pipe_node = malloc(sizeof(pipe_node_t));
+        out_pipe_node->count = cmd_node->pipe_count;
+        out_pipe_node->in_fd = new_pipe_fd[0];
+        out_pipe_node->out_fd = new_pipe_fd[1];
+        out_pipe_node->next_node = NULL;
+        insert_pipe_node(&pipe_list, out_pipe_node);
+
+        output_pipe_fd = new_pipe_fd[1];
+    }
+
+
+    pid = fork();
+    if(pid == 0) {
+        if(input_pipe_fd != -1) {
+            // not use stdin
+            close(0);
+            dup(input_pipe_fd);
+            close(input_pipe_fd);
         }
-        tmp_node_chain = tmp_node_chain->next_node;
+
+        // out
+        if(out_pipe_node != NULL) {
+            close(1);
+            dup(out_pipe_node->out_fd);
+            close(out_pipe_node->out_fd);
+        } else if(cmd_node->pipe_to_file == 1) {
+            close(1);
+            dup(output_pipe_fd);
+            close(output_pipe_fd);
+        }
+
+        execvp(cmd_node->cmd, cmd_node->args);
+    } else if(pipe_count == 0){
+        close_unused_fd();
+        int st;
+        wait(&st);
     }
 
-    if(insert_tag == 0) {
-        // if cmd not insert to any chain node, create a new node
-        node_t* new_chain_node = malloc(sizeof(node_t));
-        new_chain_node->head = (cmd_node_t*)cmd_node;
-        new_chain_node->tail = (cmd_node_t*)cmd_node;
-        new_chain_node->next_node = NULL;
-
-        insert_to_node_chain(&node_list_chain, new_chain_node);
-    } else {
-        free_cmd_node(cmd_node);
-    }
     return 0;
 }
 
-void execute_cmd_node_list_chain() {
-    node_t* tmp_node_chain = node_list_chain;
-    while(tmp_node_chain != NULL) {
-        if(tmp_node_chain->tail->pipe_count == 0) {
-            // execute!
-            cmd_node_t* _to_exec = tmp_node_chain->head;
+int get_file_fd(char* filename) {
+    return open(filename, O_RDWR | O_CREAT, S_IRUSR | S_IWUSR | S_IXUSR | S_IRGRP | S_IWGRP | S_IROTH);
+}
 
-            remove_from_chain(tmp_node_chain);
-            int init_fd[2] = {0, 1};
-            exec_cmd_node(_to_exec, init_fd);
-            int st;
-            wait(&st);
+void close_unused_fd() {
+    pipe_node_t* new_list = NULL;
+    while(pipe_list != NULL) {
+        pipe_node_t* tmp_node = pipe_list;
+        pipe_list = pipe_list->next_node;
+        tmp_node->next_node = NULL;
+
+        if(tmp_node->count <= 0) {
+            if(fcntl(tmp_node->out_fd, F_GETFD) != -1) {
+                close(tmp_node->out_fd);
+            }
+            if(fcntl(tmp_node->in_fd, F_GETFD) != -1) {
+                close(tmp_node->in_fd);
+            }
+        } else {
+            insert_pipe_node(&new_list, tmp_node);
         }
-        tmp_node_chain = tmp_node_chain->next_node;
     }
+
+    pipe_list = new_list;
 }
 
 
-void remove_from_chain(node_t* node_to_remove) {
-    if(node_to_remove == NULL) {
-        return;
-    }
-
-    if(node_to_remove == node_list_chain) {
-        node_list_chain = node_list_chain->next_node;
-    } else {
-        node_t* tmp_node_chain = node_list_chain;
-        while(tmp_node_chain->next_node != node_to_remove) {
-            tmp_node_chain = tmp_node_chain->next_node;
-        }
-        if(tmp_node_chain != NULL) {
-            tmp_node_chain->next_node = node_to_remove->next_node;
-        }
-    }
-    node_to_remove->next_node = NULL;
-    node_to_remove->head = NULL;
-    node_to_remove->tail = NULL;
-    free(node_to_remove);
-
-}
