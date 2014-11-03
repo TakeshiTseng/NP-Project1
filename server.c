@@ -63,10 +63,8 @@ void serve(int client_fd) {
             char* env_name = cmd_node_list->args[1];
             if(env_name != NULL) {
                 char* env_val = getenv(env_name);
-                write(1, env_name, strlen(env_name));
-                write(1, "=", 2);
-                write(1, env_val, strlen(env_val));
-                write(1, "\n", 1);
+                printf("%s=%s\n", env_name, env_val);
+                fflush(stdout);
             }
             cmd_node_list = cmd_node_list->next_node;
         } else if(strcmp(cmd_node_list->cmd, "setenv") == 0) {
@@ -192,12 +190,17 @@ int place_cmd_node(cmd_node_t* cmd_node) {
         }
 
         execvp(cmd_node->cmd, cmd_node->args);
-    } else if(pipe_count == 0){
-        close_unused_fd();
+    } else if(pipe_count != 0) {
         int st;
-        wait(&st);
+        waitpid(pid, &st, 0);
+        if(input_pipe_fd != -1) {
+            close(input_pipe_fd);
+        }
+    } else {
+        int st;
+        waitpid(pid, &st, 0);
+        close_unused_fd();
     }
-
     return 0;
 }
 
