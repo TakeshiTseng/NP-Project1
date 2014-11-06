@@ -31,7 +31,8 @@ void parse_tokens(cmd_node_t** cmd_node_list) {
             } else {
                 // pipe
                 if(token_type == PIPE) {
-                    current_cmd_node->pipe_count = 1;
+                    // TODO: x2
+                    current_cmd_node->pipe_count = 2;
                 } else {
                     // pipt n
                     // cut first letter
@@ -39,7 +40,8 @@ void parse_tokens(cmd_node_t** cmd_node_list) {
                     pipe_n_str = malloc(sizeof(char)*(strlen(token_str)+1));
                     strcpy(pipe_n_str, (token_str+1));
                     // set number to pipe count
-                    current_cmd_node->pipe_count = atoi(pipe_n_str);
+                    // TODO: x2
+                    current_cmd_node->pipe_count = atoi(pipe_n_str) * 2;
                     free(pipe_n_str);
                 }
 

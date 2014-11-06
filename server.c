@@ -23,6 +23,9 @@ void serve(int client_fd) {
     cmd_exec_list = NULL;
     pipe_list = NULL;
 
+    // set env
+    setenv("PATH", "bin:.", 1);
+
     // check if fd is right
     if(client_fd == -1) {
         fprintf(stderr, "Error! can't use file discription!");
